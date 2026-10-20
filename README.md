@@ -7,6 +7,7 @@ works offline, and can be installed on your phone's home screen.
 - **Goals**: goals with a category, colour, start and target date; break each into steps (with due dates) and link repeating tasks/habits to it. Shows progress and whether you're on track for the time used
 - **Timeline**: every goal as a bar across 3 months / 6 months / 1 year, with steps as markers and a line for today
 - **Calendar**: month view of tasks, steps and deadlines, plus your Google Calendar events when signed in
+- **Categories**: give goals and tasks a category with its own colour (manage them in Settings, or create one from any form). Filter Today, Goals, Timeline and Calendar by category; the calendar shows items in their category colour. Tasks linked to a goal use the goal's category unless they have their own
 - **Repeating tasks**: daily, weekdays, weekly, monthly, with an optional end date; ticked off per day
 - **Google (optional)**: sync between devices through your Google Drive, and copy dated items into a separate "GoalPlanner" Google calendar
 - Light/dark theme, backup download/restore, works offline (PWA)

@@ -7,7 +7,12 @@ import { esc, icon } from './ui.js';
 function goalTag(goalId) {
   const g = goalId && store.get('goals', goalId);
   if (!g) return '';
-  return `<a class="goal-tag" href="#/goal/${g.id}" style="--c:${esc(g.color)}">${esc(g.title)}</a>`;
+  return `<a class="goal-tag" href="#/goal/${g.id}" style="--c:${esc(store.colorOf(g))}">${esc(g.title)}</a>`;
+}
+
+export function categoryTag(item) {
+  const c = store.get('categories', store.categoryIdOf(item));
+  return c ? `<span class="cat-tag" style="--c:${esc(c.color)}">${esc(c.name)}</span>` : '';
 }
 
 // day: which day's tick to show (matters for repeating tasks). showDate: show the date in the meta line.
@@ -18,10 +23,12 @@ export function taskRow(task, day, { showDate = false } = {}) {
     showDate && task.date && !repeat ? `<span>${esc(relativeDay(task.date))}</span>` : '',
     task.time ? `<span>${icon('clock')}${esc(formatTime(task.time))}</span>` : '',
     repeat ? `<span title="${esc(REPEATS[task.repeat])}">${icon('repeat')}${esc(REPEAT_SHORT[task.repeat])}</span>` : '',
+    categoryTag(task),
     goalTag(task.goalId),
   ].filter(Boolean).join('');
+  const hasColor = store.categoryIdOf(task) || task.goalId;
   return `
-    <li class="item ${done ? 'done' : ''} ${task.priority ? 'important' : ''}">
+    <li class="item ${done ? 'done' : ''} ${task.priority ? 'important' : ''} ${hasColor ? 'has-cat' : ''}" style="--c:${esc(store.colorOf(task))}">
       <button class="tick" data-action="toggle-task" data-id="${task.id}" data-day="${day}" aria-pressed="${done}" aria-label="${done ? 'Mark not done' : 'Mark done'}: ${esc(task.title)}">${icon('check')}</button>
       <button class="item-main" data-action="edit-task" data-id="${task.id}">
         <span class="item-title">${task.priority ? icon('star', 'star') : ''}${esc(task.title)}</span>
@@ -31,13 +38,12 @@ export function taskRow(task, day, { showDate = false } = {}) {
 }
 
 export function stepRow(step, { showGoal = true, showDate = true, controls = '' } = {}) {
-  const goal = store.get('goals', step.goalId);
   const meta = [
     showDate && step.dueDate ? `<span>${icon('flag')}${esc(relativeDay(step.dueDate))}</span>` : '',
     showGoal ? goalTag(step.goalId) : '',
   ].filter(Boolean).join('');
   return `
-    <li class="item step ${step.done ? 'done' : ''}" style="--c:${esc(goal ? goal.color : 'var(--accent)')}">
+    <li class="item step ${step.done ? 'done' : ''}" style="--c:${esc(store.colorOf(step))}">
       <button class="tick" data-action="toggle-step" data-id="${step.id}" aria-pressed="${!!step.done}" aria-label="${step.done ? 'Mark not done' : 'Mark done'}: ${esc(step.title)}">${icon('check')}</button>
       <button class="item-main" data-action="edit-step" data-id="${step.id}">
         <span class="item-title">${esc(step.title)}</span>
@@ -49,7 +55,7 @@ export function stepRow(step, { showGoal = true, showDate = true, controls = '' 
 
 export function deadlineRow(goal) {
   return `
-    <li class="item deadline" style="--c:${esc(goal.color)}">
+    <li class="item deadline" style="--c:${esc(store.colorOf(goal))}">
       <span class="tick-static">${icon('flag')}</span>
       <a class="item-main" href="#/goal/${goal.id}">
         <span class="item-title">Deadline: ${esc(goal.title)}</span>

@@ -3,6 +3,7 @@
 import * as store from '../store.js';
 import { todayKey, addMonths, startOfMonth, daysBetween, formatShortMonth, formatDate, addDays } from '../dates.js';
 import { esc, icon } from '../ui.js';
+import * as filter from '../filter.js';
 
 let months = 6;
 let offset = 0; // months moved with the arrows
@@ -21,7 +22,7 @@ export function render() {
     monthCols.push({ key: start, left: pos(start), label: formatShortMonth(start) + (start.slice(5, 7) === '01' || m === 0 ? ` ${start.slice(0, 4)}` : '') });
   }
 
-  const goals = store.data.goals.filter(g => showDone || g.status !== 'done');
+  const goals = store.data.goals.filter(g => (showDone || g.status !== 'done') && filter.matches(g));
   const dated = goals.filter(g => g.startDate || g.targetDate)
     .sort((a, b) => (a.startDate || a.targetDate).localeCompare(b.startDate || b.targetDate));
   const undated = goals.filter(g => !g.startDate && !g.targetDate);
@@ -34,19 +35,20 @@ export function render() {
     const left = pos(start);
     const width = Math.max(pos(addDays(end, 1)) - left, 0.8);
     const p = store.goalProgress(g.id);
+    const color = esc(store.colorOf(g));
     const steps = store.goalSteps(g.id).filter(s => s.dueDate && s.dueDate >= from && s.dueDate <= to);
     return `
       <div class="tl-row">
-        <a class="tl-label" href="#/goal/${g.id}" style="--c:${esc(g.color)}">
+        <a class="tl-label" href="#/goal/${g.id}" style="--c:${color}">
           <span class="dot"></span><span class="tl-name">${esc(g.title)}</span><span class="muted small">${p.pct}%</span>
         </a>
         <div class="tl-track">
           ${visible ? `<a class="tl-bar ${g.status === 'done' ? 'achieved' : ''} ${start < from ? 'cut-start' : ''} ${end > to ? 'cut-end' : ''}"
-              href="#/goal/${g.id}" style="left:${left}%;width:${width}%;--c:${esc(g.color)}"
+              href="#/goal/${g.id}" style="left:${left}%;width:${width}%;--c:${color}"
               title="${esc(g.title)}: ${esc(formatDate(start))} – ${esc(formatDate(end))}">
               <span class="tl-fill" style="width:${p.pct}%"></span>
             </a>` : `<span class="tl-off muted small">${end < from ? '← earlier' : 'later →'}</span>`}
-          ${steps.map(s => `<button class="tl-step ${s.done ? 'done' : ''}" style="left:${pos(s.dueDate) + (50 / span)}%;--c:${esc(g.color)}"
+          ${steps.map(s => `<button class="tl-step ${s.done ? 'done' : ''}" style="left:${pos(s.dueDate) + (50 / span)}%;--c:${color}"
               data-action="edit-step" data-id="${s.id}" title="${esc(s.title)} · ${esc(formatDate(s.dueDate))}" aria-label="Step: ${esc(s.title)}"></button>`).join('')}
         </div>
       </div>`;
@@ -68,6 +70,7 @@ export function render() {
       </div>
       <label class="check small"><input type="checkbox" data-show-done ${showDone ? 'checked' : ''}> Show achieved</label>
     </div>
+    ${filter.filterBar()}
     <section class="card timeline">
       ${dated.length ? `<div class="tl-inner">
         <div class="tl-row tl-head">
@@ -83,7 +86,7 @@ export function render() {
           </div>
           ${rows}
         </div></div>`
-      : `<p class="muted">Give your goals a start and target date to see them here.</p>`}
+      : `<p class="muted">${filter.isActive() ? 'No dated goals in this category.' : 'Give your goals a start and target date to see them here.'}</p>`}
     </section>
     ${undated.length ? `<section class="card"><h2 class="section-title">Goals without dates</h2>
       <ul class="plain-list">${undated.map(g => `<li><a href="#/goal/${g.id}">${esc(g.title)}</a></li>`).join('')}</ul></section>` : ''}`;

@@ -207,7 +207,9 @@ main { flex: 1; min-width: 0; padding: 16px 16px calc(var(--tab-h) + 88px + env(
 .item.step .tick .ic { border-radius: 7px; border-color: var(--c); }
 .item.important .tick .ic { border-color: var(--warn-ink); }
 .tick:hover .ic { color: var(--muted); }
+.item.has-cat .tick .ic { border-color: var(--c); }
 .item.done .tick .ic { background: var(--accent); border-color: var(--accent); color: #fff; }
+.item.has-cat.done .tick .ic { background: var(--c); border-color: var(--c); }
 .item.step.done .tick .ic { background: var(--c); border-color: var(--c); }
 .tick-static { flex: none; width: 44px; display: grid; place-items: center; margin-left: -8px; color: var(--c, var(--muted)); }
 .item-main {
@@ -226,6 +228,37 @@ main { flex: 1; min-width: 0; padding: 16px 16px calc(var(--tab-h) + 88px + env(
 }
 .goal-tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
 .item.deadline .item-title { font-weight: 600; }
+.cat-tag {
+  font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 15%, transparent); color: var(--text);
+}
+/* Category filter chips and the category picker in forms */
+.cat-chip { display: inline-flex; align-items: center; gap: 6px; }
+.cat-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.cat-chip.on { background: var(--c, var(--accent)); border-color: var(--c, var(--accent)); color: #fff; }
+.cat-chip.on i { background: #fff; }
+.cat-options { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 2px; }
+.cat-options .chip { display: inline-flex; align-items: center; gap: 4px; }
+.cat-options .chip .ic { width: 15px; height: 15px; }
+.cat-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.cat-option span {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--border); font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.cat-option span i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.cat-option input:checked + span { background: var(--c); border-color: var(--c); color: #fff; }
+.cat-option input:checked + span i { background: #fff; }
+.cat-option input:focus-visible + span { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+.new-cat { margin-top: 10px; padding: 12px; border-radius: 12px; background: var(--track); }
+.new-cat > input { width: 100%; min-height: 42px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); margin-bottom: 8px; }
+.new-cat .btn-row { margin-top: 10px; justify-content: flex-end; }
+.hint { margin: 6px 0 0; }
+.cat-list { list-style: none; margin: 0 0 4px; padding: 0; }
+.cat-list li { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+.cat-list li:last-child { border-bottom: none; }
+.cat-list .cat-row { flex: 1; display: flex; align-items: center; gap: 12px; min-height: 48px; border: none; background: none; text-align: left; padding: 0; }
+.cat-list .cat-row i { width: 14px; height: 14px; border-radius: 50%; background: var(--c); flex: none; }
+.cat-list .cat-row span:first-of-type { flex: 1; font-weight: 500; }
 .row-controls { display: flex; flex: none; }
 .row-controls .icon-btn { width: 36px; height: 36px; }
 .done-list summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 8px 0; }
@@ -397,6 +430,10 @@ dialog.sheet::backdrop { background: rgba(15, 23, 42, .5); }
 .swatch span { display: block; width: 32px; height: 32px; border-radius: 50%; background: var(--c); cursor: pointer; border: 3px solid var(--card); box-shadow: 0 0 0 1px var(--border); }
 .swatch input:checked + span { box-shadow: 0 0 0 2px var(--text); }
 .swatch input:focus-visible + span { outline: 2px solid var(--accent-ink); outline-offset: 3px; }
+.swatch.custom { position: relative; width: 32px; height: 32px; border-radius: 50%; box-shadow: 0 0 0 1px var(--border);
+  background: conic-gradient(#dc2626, #ca8a04, #16a34a, #0891b2, #4f46e5, #db2777, #dc2626); }
+.swatch.custom input[type=color] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; }
+.swatch.custom:has(input[type=radio]:checked) { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--text); }
 
 /* ---------- Header sync badge & toast ---------- */
 .sync-badge {
@@ -419,4 +456,11 @@ dialog.sheet::backdrop { background: rgba(15, 23, 42, .5); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* On phones the category filter scrolls sideways instead of wrapping onto several lines */
+@media (max-width: 640px) {
+  .chips.filter { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 12px; padding: 2px 16px; scrollbar-width: none; }
+  .chips.filter::-webkit-scrollbar { display: none; }
+  .chips.filter .chip { flex: none; }
 }

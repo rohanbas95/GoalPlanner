@@ -2,7 +2,7 @@
 
 import * as store from '../store.js';
 import * as google from '../google.js';
-import { esc, toast, confirmDialog } from '../ui.js';
+import { esc, toast, confirmDialog, icon } from '../ui.js';
 
 export const THEME_KEY = 'goalPlanner.theme.v1';
 
@@ -62,6 +62,18 @@ export function render() {
     <section class="card" data-google>
       <h2 class="section-title">Google account</h2>
       ${googleSection()}
+    </section>
+    <section class="card">
+      <div class="section-head">
+        <h2 class="section-title">Categories</h2>
+        <button class="btn btn-text" data-action="new-category">${icon('plus')} Category</button>
+      </div>
+      <p class="small muted">Give goals and tasks a category to filter by it and to colour them in the calendar. Tap one to rename it or change its colour.</p>
+      ${d.categories.length ? `<ul class="cat-list">${store.categoriesSorted().map(c => {
+        const n = [...d.goals, ...d.tasks].filter(r => r.categoryId === c.id).length;
+        return `<li><button class="cat-row" data-action="edit-category" data-id="${c.id}" style="--c:${esc(c.color)}">
+          <i></i><span>${esc(c.name)}</span><span class="muted small">${n} item${n === 1 ? '' : 's'}</span>${icon('edit')}</button></li>`;
+      }).join('')}</ul>` : '<p class="small muted">No categories yet.</p>'}
     </section>
     <section class="card">
       <h2 class="section-title">Your data</h2>
@@ -130,12 +142,12 @@ export function mount(root, rerender) {
   });
 
   root.querySelector('[data-data=clear]').addEventListener('click', async () => {
-    const ok = await confirmDialog({ title: 'Delete everything?', message: 'All goals, steps and tasks on this device will be removed. Download a backup first if unsure.', confirmLabel: 'Delete everything' });
+    const ok = await confirmDialog({ title: 'Delete everything?', message: 'All goals, steps and tasks on this device will be removed (categories are kept). Download a backup first if unsure.', confirmLabel: 'Delete everything' });
     if (!ok) return;
     // Tombstones make the deletion carry over to other devices on the next sync
     const deleted = { ...store.data.deleted };
     for (const c of ['goals', 'steps', 'tasks']) for (const r of store.data[c]) deleted[r.id] = Date.now();
-    store.replaceAll({ deleted, settings: store.data.settings });
+    store.replaceAll({ deleted, settings: store.data.settings, categories: store.data.categories });
     toast('All data deleted');
   });
 }

@@ -258,6 +258,22 @@ function timed(date, time, minutes = 30) {
   };
 }
 
+// Google Calendar only offers 11 event colours; use the one nearest to the item's category colour
+const GOOGLE_COLORS = { 1: '#7986cb', 2: '#33b679', 3: '#8e24aa', 4: '#e67c73', 5: '#f6bf26', 6: '#f4511e', 7: '#039be5', 8: '#616161', 9: '#3f51b5', 10: '#0b8043', 11: '#d50000' };
+
+function googleColorId(hex) {
+  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return undefined;
+  const [r, g, b] = rgb(hex);
+  let best, bestDist = Infinity;
+  for (const [id, h] of Object.entries(GOOGLE_COLORS)) {
+    const [r2, g2, b2] = rgb(h);
+    const dist = (r - r2) ** 2 + (g - g2) ** 2 + (b - b2) ** 2;
+    if (dist < bestDist) { best = id; bestDist = dist; }
+  }
+  return best;
+}
+
 const RRULES = { daily: 'FREQ=DAILY', weekdays: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY' };
 
 function desiredEvents() {
@@ -272,6 +288,7 @@ function desiredEvents() {
       description: [t.notes, t.goalId && `Goal: ${goalTitle(t.goalId)}`].filter(Boolean).join('\n') + footer,
       ...(t.time ? timed(t.date, t.time) : allDay(t.date)),
       transparency: t.time ? 'opaque' : 'transparent',
+      colorId: googleColorId(store.colorOf(t)),
       status: 'confirmed',
     };
     if (repeat !== 'none') {
@@ -289,6 +306,7 @@ function desiredEvents() {
       description: [`Step towards: ${goal.title}`, s.notes].filter(Boolean).join('\n') + footer,
       ...allDay(s.dueDate),
       transparency: 'transparent',
+      colorId: googleColorId(store.colorOf(s)),
       status: 'confirmed',
     });
   }
@@ -299,6 +317,7 @@ function desiredEvents() {
       description: (g.description || '') + footer,
       ...allDay(g.targetDate),
       transparency: 'transparent',
+      colorId: googleColorId(store.colorOf(g)),
       status: 'confirmed',
     });
   }

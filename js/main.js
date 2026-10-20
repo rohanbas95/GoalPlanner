@@ -5,7 +5,8 @@ import * as store from './store.js';
 import * as google from './google.js';
 import { todayKey } from './dates.js';
 import { esc, icon, vibrate } from './ui.js';
-import { taskForm, goalForm, stepForm } from './forms.js';
+import { taskForm, goalForm, stepForm, categoryForm } from './forms.js';
+import * as filter from './filter.js';
 import * as today from './views/today.js';
 import * as goals from './views/goals.js';
 import * as timeline from './views/timeline.js';
@@ -33,7 +34,7 @@ function render() {
   renderedDay = todayKey();
   let view;
   switch (name) {
-    case 'goals': view = { html: goals.renderList(), mount: goals.mountList }; break;
+    case 'goals': view = { html: goals.renderList() }; break;
     case 'goal': view = { html: goals.renderDetail(param), mount: goals.mountDetail }; break;
     case 'timeline': view = timeline; break;
     case 'calendar': view = calendar; break;
@@ -99,6 +100,9 @@ document.addEventListener('click', e => {
     case 'move-step': goals.moveStep(id, Number(el.dataset.dir)); break;
     case 'new-goal': goalForm(); break;
     case 'edit-goal': { const g = store.get('goals', id); if (g) goalForm(g); break; }
+    case 'filter-cat': filter.setFilter(el.dataset.cat); render(); break;
+    case 'new-category': categoryForm(); break;
+    case 'edit-category': { const c = store.get('categories', id); if (c) categoryForm(c); break; }
     case 'achieve-goal': store.upsert('goals', { id, status: 'done', achievedAt: Date.now() }); vibrate(); break;
     default: return;
   }

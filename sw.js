@@ -5,7 +5,7 @@ const VERSION = 'v1';
 const CACHE = 'goal-planner-' + VERSION;
 const FILES = [
   './', './index.html', './css/app.css', './manifest.webmanifest', './icon.svg', './icon-192.png', './apple-touch-icon.png',
-  './js/main.js', './js/store.js', './js/dates.js', './js/ui.js', './js/forms.js', './js/items.js', './js/google.js', './js/config.js',
+  './js/main.js', './js/store.js', './js/dates.js', './js/ui.js', './js/forms.js', './js/items.js', './js/filter.js', './js/google.js', './js/config.js',
   './js/views/today.js', './js/views/goals.js', './js/views/timeline.js', './js/views/calendar.js', './js/views/settings.js',
 ];
 

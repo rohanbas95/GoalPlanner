@@ -6,6 +6,7 @@ import * as google from '../google.js';
 import { todayKey, addDays, addMonths, startOfMonth, daysInMonth, weekday, formatMonth, formatLong, formatTime } from '../dates.js';
 import { esc, icon } from '../ui.js';
 import { taskRow, stepRow, deadlineRow } from '../items.js';
+import * as filter from '../filter.js';
 
 let month = startOfMonth(todayKey());
 let selected = todayKey();
@@ -15,9 +16,10 @@ let gError = '';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-function goalColor(goalId) {
-  const g = goalId && store.get('goals', goalId);
-  return g ? g.color : 'var(--accent)';
+// Items of one day, narrowed to the chosen category
+function on(day) {
+  const { tasks, steps, goals } = store.itemsOn(day);
+  return { tasks: tasks.filter(filter.matches), steps: steps.filter(filter.matches), goals: goals.filter(filter.matches) };
 }
 
 function gridRange() {
@@ -36,12 +38,13 @@ export function render() {
   const days = [];
   for (let i = 0; i < cells; i++) {
     const day = addDays(first, i);
-    const { tasks, steps, goals } = store.itemsOn(day);
+    const { tasks, steps, goals } = on(day);
     const chips = [
-      ...goals.map(g => ({ cls: 'deadline', c: g.color, text: '🏁 ' + g.title })),
-      ...store.sortTasks(tasks, day).map(t => ({ cls: store.isTaskDone(t, day) ? 'done' : '', c: goalColor(t.goalId), text: (t.time ? formatTime(t.time) + ' ' : '') + t.title })),
-      ...steps.map(s => ({ cls: 'step' + (s.done ? ' done' : ''), c: goalColor(s.goalId), text: '🎯 ' + s.title })),
-      ...((events && events[day]) || []).map(e => ({ cls: 'gcal', c: 'var(--muted)', text: (e.time ? formatTime(e.time) + ' ' : '') + e.title })),
+      ...goals.map(g => ({ cls: 'deadline', c: store.colorOf(g), text: '🏁 ' + g.title })),
+      ...store.sortTasks(tasks, day).map(t => ({ cls: store.isTaskDone(t, day) ? 'done' : '', c: store.colorOf(t), text: (t.time ? formatTime(t.time) + ' ' : '') + t.title })),
+      ...steps.map(s => ({ cls: 'step' + (s.done ? ' done' : ''), c: store.colorOf(s), text: '🎯 ' + s.title })),
+      // Google events have no category, so a category filter hides them
+      ...((!filter.isActive() && events && events[day]) || []).map(e => ({ cls: 'gcal', c: 'var(--muted)', text: (e.time ? formatTime(e.time) + ' ' : '') + e.title })),
     ];
     days.push(`
       <button class="cal-day ${day.slice(0, 7) !== month.slice(0, 7) ? 'other' : ''} ${day === today ? 'today' : ''} ${day === selected ? 'selected' : ''}"
@@ -53,8 +56,8 @@ export function render() {
       </button>`);
   }
 
-  const sel = store.itemsOn(selected);
-  const selEvents = (events && events[selected]) || [];
+  const sel = on(selected);
+  const selEvents = (!filter.isActive() && events && events[selected]) || [];
   const hasAny = sel.tasks.length || sel.steps.length || sel.goals.length || selEvents.length;
   let gNote = '';
   if (google.canShowEvents() && !google.tokenValid()) gNote = 'Reconnect Google (top right) to see your Google Calendar events.';
@@ -65,6 +68,7 @@ export function render() {
       <h1 class="page-title">Calendar</h1>
       <button class="btn btn-primary" data-action="new-task" data-date="${selected}">${icon('plus')} Task</button>
     </div>
+    ${filter.filterBar()}
     <section class="card calendar">
       <div class="cal-head" data-cal-nav>
         <button class="icon-btn" data-shift="-1" aria-label="Previous month">${icon('chevronLeft')}</button>
@@ -77,7 +81,8 @@ export function render() {
         ${days.join('')}
       </div>
       <div class="cal-legend small muted">
-        <span>Colours match your goals</span><span>🎯 Goal step</span><span>🏁 Goal deadline</span>
+        ${store.categoriesSorted().map(c => `<span><i style="--c:${esc(c.color)}"></i>${esc(c.name)}</span>`).join('')}
+        <span>🎯 Goal step</span><span>🏁 Goal deadline</span>
         ${google.canShowEvents() ? '<span><i class="gcal"></i>Google Calendar</span>' : ''}
       </div>
       ${gNote ? `<p class="small muted">${esc(gNote)}</p>` : ''}

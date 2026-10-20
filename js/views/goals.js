@@ -4,8 +4,12 @@ import * as store from '../store.js';
 import { todayKey, formatDate, daysLeftLabel, daysBetween } from '../dates.js';
 import { esc, icon } from '../ui.js';
 import { taskRow, stepRow, progressBar, emptyState } from '../items.js';
+import * as filter from '../filter.js';
 
-let categoryFilter = '';
+function categoryPill(g) {
+  const c = store.get('categories', g.categoryId);
+  return c ? `<span class="pill" style="--c:${esc(c.color)}">${esc(c.name)}</span>` : '<span></span>';
+}
 
 export function renderList() {
   const goals = store.data.goals;
@@ -15,9 +19,7 @@ export function renderList() {
         'Pick something you want to achieve, give it a target date, then break it into small steps.',
         `<button class="btn btn-primary" data-action="new-goal">${icon('plus')} New goal</button>`)}</section>`;
   }
-  const categories = [...new Set(goals.map(g => g.category).filter(Boolean))].sort();
-  if (categoryFilter && !categories.includes(categoryFilter)) categoryFilter = '';
-  const shown = goals.filter(g => !categoryFilter || g.category === categoryFilter);
+  const shown = goals.filter(filter.matches);
   const groups = [
     ['active', 'Active'],
     ['paused', 'Paused'],
@@ -30,10 +32,8 @@ export function renderList() {
       <h1 class="page-title">Goals</h1>
       <button class="btn btn-primary" data-action="new-goal">${icon('plus')} New goal</button>
     </div>
-    ${categories.length > 1 ? `<div class="chips filter" data-category-filter>
-      <button class="chip ${!categoryFilter ? 'on' : ''}" data-cat="">All</button>
-      ${categories.map(c => `<button class="chip ${c === categoryFilter ? 'on' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
-    </div>` : ''}
+    ${filter.filterBar()}
+    ${shown.length ? '' : '<p class="muted">No goals in this category.</p>'}
     ${groups.filter(([, list]) => list.length).map(([label, list]) => `
       <h2 class="group-title">${label} <span class="muted">${list.length}</span></h2>
       <div class="goal-grid">${list.map(goalCard).join('')}</div>`).join('')}`;
@@ -43,29 +43,21 @@ function goalCard(g) {
   const p = store.goalProgress(g.id);
   const next = store.goalSteps(g.id).find(s => !s.done);
   const late = g.status === 'active' && g.targetDate && g.targetDate < todayKey();
+  const color = store.colorOf(g);
   return `
-    <a class="card goal-card ${g.status === 'done' ? 'achieved' : ''}" href="#/goal/${g.id}" style="--c:${esc(g.color)}">
+    <a class="card goal-card ${g.status === 'done' ? 'achieved' : ''}" href="#/goal/${g.id}" style="--c:${esc(color)}">
       <div class="goal-card-top">
-        ${g.category ? `<span class="pill">${esc(g.category)}</span>` : '<span></span>'}
+        ${categoryPill(g)}
         ${g.targetDate ? `<span class="small ${late ? 'danger-ink' : 'muted'}">${g.status === 'done' ? '🎉 Achieved' : esc(daysLeftLabel(g.targetDate))}</span>` : ''}
       </div>
       <h3>${esc(g.title)}</h3>
-      ${progressBar(p.pct, g.color)}
+      ${progressBar(p.pct, color)}
       <div class="goal-card-foot">
         <span class="muted small">${p.total ? `${p.done} of ${p.total} steps` : 'No steps yet'}</span>
         <span class="small strong">${p.pct}%</span>
       </div>
       ${next && g.status !== 'done' ? `<p class="small next-step">Next: ${esc(next.title)}</p>` : ''}
     </a>`;
-}
-
-export function mountList(root, rerender) {
-  root.querySelector('[data-category-filter]')?.addEventListener('click', e => {
-    const b = e.target.closest('[data-cat]');
-    if (!b) return;
-    categoryFilter = b.dataset.cat;
-    rerender();
-  });
 }
 
 export function renderDetail(id) {
@@ -75,6 +67,7 @@ export function renderDetail(id) {
   }
   const steps = store.goalSteps(id);
   const p = store.goalProgress(id);
+  const color = store.colorOf(g);
   const tasks = store.data.tasks.filter(t => t.goalId === id);
   const today = todayKey();
   let timeInfo = '';
@@ -99,9 +92,9 @@ export function renderDetail(id) {
 
   return `
     <a class="back" href="#/goals">${icon('chevronLeft')} Goals</a>
-    <section class="card goal-hero" style="--c:${esc(g.color)}">
+    <section class="card goal-hero" style="--c:${esc(color)}">
       <div class="goal-card-top">
-        ${g.category ? `<span class="pill">${esc(g.category)}</span>` : '<span></span>'}
+        ${categoryPill(g)}
         <button class="btn btn-text" data-action="edit-goal" data-id="${g.id}">${icon('edit')} Edit</button>
       </div>
       <h1>${esc(g.title)}</h1>
@@ -112,7 +105,7 @@ export function renderDetail(id) {
         <div><strong>${g.status === 'done' ? '🎉' : g.targetDate ? esc(daysLeftLabel(g.targetDate).split(' ')[0]) : '–'}</strong>
           <span class="muted small">${g.status === 'done' ? 'achieved' : g.targetDate ? esc(daysLeftLabel(g.targetDate).split(' ').slice(1).join(' ')) : 'no target date'}</span></div>
       </div>
-      ${progressBar(p.pct, g.color)}
+      ${progressBar(p.pct, color)}
       ${timeInfo}
       ${g.status !== 'done' && p.total && p.done === p.total ? `
         <div class="celebrate">All steps done! <button class="btn btn-primary" data-action="achieve-goal" data-id="${g.id}">Mark goal achieved 🎉</button></div>` : ''}

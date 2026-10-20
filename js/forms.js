@@ -2,7 +2,82 @@
 
 import * as store from './store.js';
 import { REPEATS, todayKey, addDays, addMonths } from './dates.js';
-import { esc, openForm, toast, confirmDialog } from './ui.js';
+import { esc, openForm, toast, confirmDialog, icon } from './ui.js';
+import * as filter from './filter.js';
+
+// ---------- Colour and category pickers (used inside forms) ----------
+
+function colorSwatches(name, selected) {
+  const custom = selected && !store.COLORS.includes(selected);
+  return `<div class="swatches">
+    ${store.COLORS.map(c => `<label class="swatch" style="--c:${c}"><input type="radio" name="${name}" value="${c}" ${c === selected ? 'checked' : ''} aria-label="Colour ${c}"><span></span></label>`).join('')}
+    <label class="swatch custom" title="Pick any colour"><input type="radio" name="${name}" value="custom" ${custom ? 'checked' : ''} aria-label="Custom colour">
+      <input type="color" name="${name}Custom" value="${custom ? esc(selected) : '#0f766e'}" aria-label="Choose custom colour"></label>
+  </div>`;
+}
+
+function readColor(values, name, fallback) {
+  const v = values[name];
+  if (v === 'custom') return values[name + 'Custom'] || fallback;
+  return v || fallback;
+}
+
+// Picking a custom colour selects the custom swatch
+function mountSwatches(root) {
+  root.querySelectorAll('.swatch.custom input[type=color]').forEach(input => {
+    input.addEventListener('input', () => { input.parentElement.querySelector('input[type=radio]').checked = true; });
+  });
+}
+
+function categoryChip(c, selected) {
+  return `<label class="cat-option" style="--c:${esc(c.color)}"><input type="radio" name="categoryId" value="${c.id}" ${c.id === selected ? 'checked' : ''}><span><i></i>${esc(c.name)}</span></label>`;
+}
+
+function categoryPicker(selected, hint = '') {
+  return `<fieldset class="field"><legend>Category</legend>
+    <div class="cat-options" data-cat-options>
+      <label class="cat-option" style="--c:${store.UNCATEGORISED}"><input type="radio" name="categoryId" value="" ${!selected ? 'checked' : ''}><span>None</span></label>
+      ${store.categoriesSorted().map(c => categoryChip(c, selected)).join('')}
+      <button type="button" class="chip" data-new-cat>${icon('plus')} New</button>
+    </div>
+    <div class="new-cat" data-new-cat-panel hidden>
+      <input data-new-cat-name maxlength="40" placeholder="Category name, e.g. Fitness" aria-label="New category name">
+      ${colorSwatches('newCatColor', store.nextCategoryColor())}
+      <div class="btn-row"><button type="button" class="btn btn-secondary" data-new-cat-cancel>Cancel</button>
+        <button type="button" class="btn btn-primary" data-new-cat-add>Add category</button></div>
+    </div>
+    ${hint ? `<p class="small muted hint">${hint}</p>` : ''}
+  </fieldset>`;
+}
+
+// onChange(categoryId) runs when the choice changes (e.g. to show or hide the goal colour)
+function mountCategoryPicker(form, onChange = () => {}) {
+  const options = form.querySelector('[data-cat-options]');
+  const panel = form.querySelector('[data-new-cat-panel]');
+  const name = panel.querySelector('[data-new-cat-name]');
+  mountSwatches(panel);
+  options.addEventListener('change', () => onChange(form.elements.categoryId.value));
+  form.querySelector('[data-new-cat]').addEventListener('click', () => { panel.hidden = false; name.focus(); });
+  form.querySelector('[data-new-cat-cancel]').addEventListener('click', () => { panel.hidden = true; name.value = ''; });
+  const add = () => {
+    const title = name.value.trim();
+    if (!title) { name.focus(); return; }
+    const existing = store.data.categories.find(c => c.name.toLowerCase() === title.toLowerCase());
+    const values = Object.fromEntries(new FormData(form).entries());
+    const cat = existing || store.upsert('categories', {
+      name: title, color: readColor(values, 'newCatColor', store.COLORS[0]), order: store.data.categories.length,
+    });
+    if (!existing) form.querySelector('[data-new-cat]').insertAdjacentHTML('beforebegin', categoryChip(cat, cat.id));
+    options.querySelector(`input[value="${cat.id}"]`).checked = true;
+    panel.hidden = true;
+    name.value = '';
+    onChange(cat.id);
+  };
+  form.querySelector('[data-new-cat-add]').addEventListener('click', add);
+  // Enter in the name box adds the category instead of submitting the whole form
+  name.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+}
+
 
 function goalOptions(selected) {
   const goals = store.data.goals.filter(g => g.status !== 'done' || g.id === selected);
@@ -11,7 +86,7 @@ function goalOptions(selected) {
 }
 
 export function taskForm(task = {}, defaults = {}) {
-  const t = { title: '', notes: '', date: todayKey(), time: '', repeat: 'none', repeatUntil: '', goalId: '', priority: false, ...defaults, ...task };
+  const t = { title: '', notes: '', date: todayKey(), time: '', repeat: 'none', repeatUntil: '', goalId: '', categoryId: task.id || defaults.goalId ? '' : filter.selectedCategory(), priority: false, ...defaults, ...task };
   const isNew = !task.id;
   openForm({
     title: isNew ? 'New task' : 'Edit task',
@@ -35,9 +110,11 @@ export function taskForm(task = {}, defaults = {}) {
           <input type="date" name="repeatUntil" value="${esc(t.repeatUntil)}"></label>
       </div>
       <label class="field"><span>Part of a goal</span><select name="goalId">${goalOptions(t.goalId)}</select></label>
+      ${categoryPicker(t.categoryId, 'With no category, a task linked to a goal uses the goal\'s category.')}
       <label class="field"><span>Notes</span><textarea name="notes" rows="2" maxlength="2000">${esc(t.notes)}</textarea></label>
       <label class="check"><input type="checkbox" name="priority" ${t.priority ? 'checked' : ''}> Important</label>`,
     onMount(form) {
+      mountCategoryPicker(form);
       const repeat = form.elements.repeat;
       const until = form.querySelector('[data-until]');
       repeat.addEventListener('change', () => {
@@ -61,6 +138,7 @@ export function taskForm(task = {}, defaults = {}) {
         repeat,
         repeatUntil: repeat === 'none' ? '' : v.repeatUntil,
         goalId: v.goalId,
+        categoryId: v.categoryId || '',
         priority: v.priority,
       });
       toast(isNew ? 'Task added ✓' : 'Saved ✓');
@@ -76,7 +154,7 @@ export function deleteTask(task) {
 
 export function goalForm(goal = {}) {
   const g = {
-    title: '', description: '', category: '', color: store.COLORS[store.data.goals.length % store.COLORS.length],
+    title: '', description: '', categoryId: goal.id ? '' : filter.selectedCategory(), color: store.COLORS[store.data.goals.length % store.COLORS.length],
     startDate: todayKey(), targetDate: addMonths(todayKey(), 3), status: 'active', ...goal,
   };
   const isNew = !goal.id;
@@ -88,20 +166,20 @@ export function goalForm(goal = {}) {
         <input name="title" required autofocus maxlength="200" value="${esc(g.title)}" placeholder="e.g. Run a half marathon"></label>
       <label class="field"><span>Why does it matter? (optional)</span>
         <textarea name="description" rows="2" maxlength="2000" placeholder="Your reason keeps you going">${esc(g.description)}</textarea></label>
-      <label class="field"><span>Category</span>
-        <input name="category" list="categoryList" maxlength="40" value="${esc(g.category)}" placeholder="Health, Career, Learning…">
-        <datalist id="categoryList">${categoryNames().map(c => `<option value="${esc(c)}">`).join('')}</datalist></label>
+      ${categoryPicker(g.categoryId, 'The goal, its steps and its tasks show in the category\'s colour.')}
       <div class="row2">
         <label class="field"><span>Start</span><input type="date" name="startDate" value="${esc(g.startDate)}"></label>
         <label class="field"><span>Target date</span><input type="date" name="targetDate" value="${esc(g.targetDate)}"></label>
       </div>
-      <fieldset class="field"><legend>Colour</legend>
-        <div class="swatches">${store.COLORS.map(c => `
-          <label class="swatch" style="--c:${c}"><input type="radio" name="color" value="${c}" ${c === g.color ? 'checked' : ''} aria-label="Colour ${c}"><span></span></label>`).join('')}
-        </div></fieldset>
+      <fieldset class="field" data-goal-color ${g.categoryId ? 'hidden' : ''}><legend>Colour (used when there's no category)</legend>
+        ${colorSwatches('color', g.color)}</fieldset>
       ${isNew ? '' : `<label class="field"><span>Status</span><select name="status">
         ${[['active', 'Active'], ['paused', 'Paused'], ['done', 'Achieved 🎉']].map(([k, l]) => `<option value="${k}" ${k === g.status ? 'selected' : ''}>${l}</option>`).join('')}
       </select></label>`}`,
+    onMount(form) {
+      mountSwatches(form.querySelector('[data-goal-color]'));
+      mountCategoryPicker(form, id => { form.querySelector('[data-goal-color]').hidden = !!id; });
+    },
     onSubmit(v) {
       if (v.startDate && v.targetDate && v.targetDate < v.startDate) {
         toast('The target date is before the start date.');
@@ -111,8 +189,8 @@ export function goalForm(goal = {}) {
         ...(goal.id ? { id: goal.id } : {}),
         title: v.title.trim(),
         description: v.description.trim(),
-        category: v.category.trim(),
-        color: v.color || g.color,
+        categoryId: v.categoryId || '',
+        color: readColor(v, 'color', g.color),
         startDate: v.startDate,
         targetDate: v.targetDate,
         status: v.status || g.status,
@@ -122,11 +200,6 @@ export function goalForm(goal = {}) {
     },
     extra: isNew ? [] : [{ label: 'Delete goal', className: 'btn-text danger', onClick: () => { deleteGoal(goal); } }],
   });
-}
-
-function categoryNames() {
-  const used = store.data.goals.map(g => g.category).filter(Boolean);
-  return [...new Set([...used, ...store.CATEGORIES])];
 }
 
 export async function deleteGoal(goal) {
@@ -168,4 +241,48 @@ export function stepForm(goalId, step = {}) {
 export function deleteStep(step) {
   const removed = store.remove('steps', step.id);
   toast('Step deleted', { action: 'Undo', onAction: () => store.restore('steps', removed) });
+}
+
+// ---------- Category add / edit (Settings) ----------
+
+export function categoryForm(cat = {}) {
+  const isNew = !cat.id;
+  const c = { name: '', color: store.nextCategoryColor(), ...cat };
+  openForm({
+    title: isNew ? 'New category' : 'Edit category',
+    submitLabel: isNew ? 'Add category' : 'Save',
+    body: `
+      <label class="field"><span>Name</span>
+        <input name="name" required autofocus maxlength="40" value="${esc(c.name)}" placeholder="e.g. Fitness"></label>
+      <fieldset class="field"><legend>Colour</legend>${colorSwatches('color', c.color)}</fieldset>`,
+    onMount: form => mountSwatches(form),
+    onSubmit(v) {
+      const name = v.name.trim();
+      const clash = store.data.categories.find(x => x.id !== cat.id && x.name.toLowerCase() === name.toLowerCase());
+      if (clash) { toast(`There's already a category called "${clash.name}".`); return false; }
+      store.upsert('categories', {
+        ...(cat.id ? { id: cat.id } : { order: store.data.categories.length }),
+        name, color: readColor(v, 'color', c.color),
+      });
+      toast(isNew ? 'Category added ✓' : 'Saved ✓');
+    },
+    extra: isNew ? [] : [{ label: 'Delete', className: 'btn-text danger', onClick: () => { deleteCategory(cat); } }],
+  });
+}
+
+export async function deleteCategory(cat) {
+  const used = [...store.data.goals, ...store.data.tasks].filter(r => r.categoryId === cat.id);
+  if (used.length) {
+    const ok = await confirmDialog({
+      title: `Delete "${cat.name}"?`,
+      message: `${used.length} goal${used.length === 1 ? '' : 's'} and task${used.length === 1 ? '' : 's'} use it. They'll be kept, with no category.`,
+    });
+    if (!ok) return;
+  }
+  const ids = used.map(r => r.id);
+  const removed = store.remove('categories', cat.id);
+  toast('Category deleted', { action: 'Undo', onAction: () => {
+    store.restore('categories', removed);
+    for (const r of [...store.data.goals, ...store.data.tasks]) if (ids.includes(r.id)) store.upsert(store.get('goals', r.id) ? 'goals' : 'tasks', { id: r.id, categoryId: cat.id });
+  } });
 }
